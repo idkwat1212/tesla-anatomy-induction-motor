@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tesla Anatomy — Induction Motor (US381968)</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a222d;
+    --panel2: #243040;
+    --mut: #8b9bb0;
+    --fg: #e8eef6;
+    --acc: #f59e0b;
+    --ok: #34d399;
+    --warn: #fb923c;
+    --border: #2d3a4d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { display: grid; grid-template-columns: 320px 1fr 300px; grid-template-rows: 48px 1fr; height: 100%; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    background: #0a0e13; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 15px; font-weight: 650; margin: 0; letter-spacing: 0.02em; }
+  header .tag { font-size: 11px; color: var(--mut); background: var(--panel2); padding: 2px 8px; border-radius: 999px; }
+  header .spacer { flex: 1; }
+  header button { background: var(--panel2); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+  header button:hover { border-color: var(--acc); }
+  header button.pri { background: var(--acc); color: #111; border-color: var(--acc); font-weight: 600; }
+  #left, #right { background: var(--panel); border-right: 1px solid var(--border); overflow: auto; padding: 12px; }
+  #right { border-right: none; border-left: 1px solid var(--border); }
+  #stage { position: relative; background: #121820; min-height: 0; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mut); margin: 14px 0 8px; }
+  h2:first-child { margin-top: 0; }
+  .sl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 8px; align-items: center; }
+  .sl label { color: var(--mut); font-size: 12px; grid-column: 1 / -1; }
+  .sl input[type=range] { width: 100%; accent-color: var(--acc); }
+  .sl output { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--fg); min-width: 64px; text-align: right; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-variant-numeric: tabular-nums; }
+  .kv b { color: var(--mut); font-weight: 500; }
+  .kv span { text-align: right; }
+  .kv .hi { color: var(--ok); font-weight: 600; }
+  .layer { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .layer input { accent-color: var(--acc); }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .ribbon { background: #0d1f17; border: 1px solid #1f4d3a; border-radius: 10px; padding: 10px; font-size: 12px; line-height: 1.55; }
+  .ribbon .step { display: inline-block; background: #163528; color: var(--ok); padding: 1px 6px; border-radius: 4px; margin: 2px 0; }
+  .ribbon .arr { color: var(--mut); margin: 0 2px; }
+  .myth { background: #1f1710; border: 1px solid #5b3d1a; border-radius: 10px; padding: 10px; font-size: 12px; color: #fcd9a8; }
+  .myth summary { cursor: pointer; font-weight: 600; color: var(--warn); }
+  .eq { background: var(--panel2); border-radius: 8px; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: #cde; margin-bottom: 6px; white-space: pre-wrap; }
+  .note { color: var(--mut); font-size: 11px; margin-top: 6px; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+  .badge.known { background: #14532d; color: #86efac; }
+  .badge.est { background: #713f12; color: #fde68a; }
+  a { color: var(--acc); }
+  #hud-overlay { position: absolute; left: 10px; top: 10px; pointer-events: none; text-shadow: 0 1px 2px #000;
+    font-size: 12px; color: #fff; }
+  @media (max-width: 960px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 48px auto 50vh auto; }
+    #left, #right { border: none; border-bottom: 1px solid var(--border); max-height: 40vh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Tesla Anatomy — Induction Motor</h1>
+    <span class="tag">US381968 family · desktop slice 1</span>
+    <span class="spacer"></span>
+    <button id="bFit">Fit</button>
+    <button id="bSpin">Spin</button>
+    <button id="bMyth" class="pri">Myth drawer</button>
+  </header>
+
+  <aside id="left">
+    <h2>Explode</h2>
+    <div class="sl">
+      <label>Explode amount (axial +Y)</label>
+      <input type="range" id="explode" min="0" max="1" step="0.01" value="0.35">
+      <output id="explodeOut">0.35</output>
+    </div>
+
+    <h2>Layers</h2>
+    <div id="layers"></div>
+
+    <h2>Closed loop <span class="badge known">Known</span></h2>
+    <div class="ribbon" id="ribbon"></div>
+
+    <h2>Equations</h2>
+    <div class="eq" id="eqNs">ns = 120 · f / p   (rpm)</div>
+    <div class="eq" id="eqT">T ∝ s·R2·V² / (R2² + (s·X2)²)</div>
+    <p class="note">Torque uses a 3-phase teaching scale factor K = 3·p / (4·π·f) so T is in N·m. Stator R1/X1 omitted from the peak shape (rotor-limited approx). <span class="badge est">Estimate</span></p>
+  </aside>
+
+  <main id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hud-overlay"></div>
+  </main>
+
+  <aside id="right">
+    <h2>Parameters</h2>
+    <div id="params"></div>
+
+    <h2>Live outputs</h2>
+    <div class="kv" id="outs"></div>
+    <p class="note" id="statusNote"></p>
+
+    <h2>Patents</h2>
+    <div id="patents" class="note"></div>
+
+    <details class="myth" id="mythPanel" style="margin-top:14px">
+      <summary>Myth vs verified</summary>
+      <p style="margin:8px 0 0">
+        <strong>Verified:</strong> rotating magnetic field / induction motor is industrial standard
+        [<span class="badge known">Known</span>].<br><br>
+        <strong>History (honest):</strong> Galileo Ferraris demonstrated a rotating field independently
+        (priority dispute with Tesla). Early Tesla demos were often <em>two-phase</em>; industry later
+        standardized on <em>three-phase</em>.<br><br>
+        <strong>Not claimed here:</strong> free energy, over-unity, ether. COP < 1 always for this machine.
+        Radiant-energy patents (US685957/958) are a separate family and are <em>not</em> this motor —
+        see <code>08-speculative-vs-verified.md</code>.
+      </p>
+    </details>
+  </aside>
+</div>
+
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+THREE.OrbitControls = OrbitControls;
+window.THREE = THREE;
+window.dispatchEvent(new Event('three-ready'));
+</script>
+<script>
+(function wait(){
+  if (!window.THREE) { window.addEventListener('three-ready', start); return; }
+  start();
+  function start(){
+/* Tesla Anatomy — Induction Motor desktop HUD
+   Geometry: parametric Three.js primitives (not scanned CAD, not patent-PDF mesh).
+   Explode idea: axial offset of named Groups (gltf-exploder / CloseUp pattern, reimplemented).
+   Math: CONCEPT-MATH §2.1 — ns, slip, rotor-branch torque approx.
+*/
+(function () {
+  const T3 = THREE;
+  const MACHINE = {
+    layers: [
+      { id: 'frame', label: 'Frame', explode_offset: 0, color: 0x6b7280, visible: true },
+      { id: 'stator_core', label: 'Stator core', explode_offset: 0.55, color: 0x94a3b8, visible: true },
+      { id: 'windings', label: 'Windings', explode_offset: 1.1, color: 0xf59e0b, visible: true },
+      { id: 'air_gap', label: 'Air gap', explode_offset: 1.65, color: 0x38bdf8, visible: true },
+      { id: 'rotor_cage', label: 'Rotor cage', explode_offset: 2.2, color: 0xc084fc, visible: true },
+      { id: 'shaft', label: 'Shaft', explode_offset: 2.75, color: 0xe2e8f0, visible: true },
+      { id: 'load', label: 'Load', explode_offset: 3.4, color: 0x34d399, visible: true },
+    ],
+    params: [
+      { id: 'f', label: 'f (Hz)', def: 60, min: 10, max: 400, step: 1 },
+      { id: 'p', label: 'p poles', def: 4, min: 2, max: 12, step: 2 },
+      { id: 'V', label: 'V (V)', def: 230, min: 50, max: 480, step: 1 },
+      { id: 'R1', label: 'R1 (Ω)', def: 1.2, min: 0.1, max: 10, step: 0.1 },
+      { id: 'X1', label: 'X1 (Ω)', def: 1.5, min: 0.1, max: 20, step: 0.1 },
+      { id: 'R2', label: 'R2′ (Ω)', def: 1.0, min: 0.05, max: 10, step: 0.05 },
+      { id: 'X2', label: 'X2′ (Ω)', def: 1.5, min: 0.1, max: 20, step: 0.1 },
+      { id: 'Nm', label: 'T_load (N·m)', def: 5, min: 0, max: 40, step: 0.5 },
+    ],
+    closed_loop: [
+      'electrical input (V, f)',
+      'rotating B at ns',
+      'rotor currents at s·f',
+      'torque T',
+      'mechanical load T_load',
+      'back on slip s',
+    ],
+    patents: [
+      ['US381968', 'Electro magnetic motor (basic)', 'https://patents.google.com/patent/US381968'],
+      ['US382279', 'Induction magnetic motor', 'https://patents.google.com/patent/US382279'],
+      ['US416191', 'Polyphase induction motor', 'https://patents.google.com/patent/US416191'],
+      ['US416194', 'Classic AC EM motor', 'https://patents.google.com/patent/US416194'],
+      ['US555190', 'Alternating motor', 'https://patents.google.com/patent/US555190'],
+    ],
+  };
+
+  const P = {};
+  MACHINE.params.forEach(p => { P[p.id] = p.def; });
+
+  /* ---------- Math (must compute) ---------- */
+  /**
+   * Teaching model (document exactly):
+   *   ns = 120 * f / p                         [Known] rpm
+   *   shape(s) = s*R2*V^2 / (R2^2 + (s*X2)^2)  [Known form]
+   *   K = 3 * p / (4 * Math.PI * f)            [Estimate] N·m scale for 3-phase
+   *   T(s) = K * shape(s)
+   * Steady state: find s in (0, 1] such that T(s) ≈ T_load (Nm).
+   * If T_load > T_max → stall (s→1, flag).
+   *   n = ns * (1 - s)
+   *   ω = 2π n / 60
+   *   Pout = T * ω
+   *   Pin ≈ 3 * (V^2 * (s*R2) / (R2^2+(s*X2)^2))   air-gap power proxy [Estimate]
+   *   η = Pout / Pin
+   * R1, X1 shown for completeness / future Thevenin; not in T(s) this slice.
+   */
+  function torqueShape(s, R2, X2, V) {
+    const den = R2 * R2 + (s * X2) * (s * X2);
+    if (den < 1e-12) return 0;
+    return (s * R2 * V * V) / den;
+  }
+  function scaleK(f, p) {
+    // 3-phase teaching factor → N·m
+    return (3 * p) / (4 * Math.PI * Math.max(f, 1e-6));
+  }
+  function torqueAt(s, f, p, V, R2, X2) {
+    return scaleK(f, p) * torqueShape(s, R2, X2, V);
+  }
+  function findSlipForLoad(Tload, f, p, V, R2, X2) {
+    // Sample torque curve; locate max; binary-search rising side (s from 0+ to s_max)
+    const N = 200;
+    let sMax = 0.02, tMax = 0;
+    for (let i = 1; i <= N; i++) {
+      const s = i / N;
+      const t = torqueAt(s, f, p, V, R2, X2);
+      if (t > tMax) { tMax = t; sMax = s; }
+    }
+    if (Tload <= 0) return { s: 0.001, T: torqueAt(0.001, f, p, V, R2, X2), tMax, stalled: false };
+    if (Tload >= tMax * 0.999) {
+      return { s: 1, T: torqueAt(1, f, p, V, R2, X2), tMax, stalled: true };
+    }
+    // binary search on [eps, sMax] where T increases with s for small s
+    let lo = 1e-4, hi = sMax, s = sMax;
+    for (let k = 0; k < 40; k++) {
+      const mid = 0.5 * (lo + hi);
+      const t = torqueAt(mid, f, p, V, R2, X2);
+      if (t < Tload) lo = mid; else { hi = mid; s = mid; }
+    }
+    return { s, T: torqueAt(s, f, p, V, R2, X2), tMax, stalled: false };
+  }
+  function compute(p) {
+    const f = p.f, poles = Math.max(2, Math.round(p.p / 2) * 2);
+    const ns = 120 * f / poles;
+    const { s, T, tMax, stalled } = findSlipForLoad(p.Nm, f, poles, p.V, p.R2, p.X2);
+    const n = ns * (1 - s);
+    const omega = 2 * Math.PI * n / 60;
+    const Pout = T * omega;
+    const gap = torqueShape(s, p.R2, p.X2, p.V); // V^2 term shape without K
+    const Pin = 3 * gap; // air-gap power proxy [Estimate]
+    const eta = Pin > 1e-6 ? Math.max(0, Math.min(1, Pout / Pin)) : 0;
+    return { ns, s, n, T, tMax, Pin, Pout, eta, stalled, poles, f };
+  }
+
+  /* ---------- Three.js scene ---------- */
+  const cv = document.getElementById('cv');
+  const renderer = new T3.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.outputColorSpace = T3.SRGBColorSpace;
+  const scene = new T3.Scene();
+  scene.background = new T3.Color(0x121820);
+  const cam = new T3.PerspectiveCamera(45, 1, 0.05, 200);
+  const ctl = new T3.OrbitControls(cam, cv);
+  ctl.enableDamping = true; ctl.dampingFactor = 0.1;
+  const hemi = new T3.HemisphereLight(0xffffff, 0x1a2030, 1.1);
+  const dir = new T3.DirectionalLight(0xffffff, 1.4); dir.position.set(4, 6, 3);
+  scene.add(hemi, dir);
+  const grid = new T3.GridHelper(8, 16, 0x334155, 0x1e293b);
+  grid.position.y = -1.6; scene.add(grid);
+
+  const root = new T3.Group();
+  scene.add(root);
+  const layerGroups = {};
+
+  function mat(color, opts) {
+    return new T3.MeshStandardMaterial(Object.assign({
+      color, roughness: 0.55, metalness: 0.25, side: T3.DoubleSide,
+    }, opts || {}));
+  }
+
+  function makeHelix(radius, tube, turns, height, radialSeg, tubularSeg, phase) {
+    // Parametric helix as TubeGeometry along a curve
+    class HelixCurve extends T3.Curve {
+      constructor() { super(); }
+      getPoint(t, optionalTarget) {
+        const point = optionalTarget || new T3.Vector3();
+        const a = phase + t * turns * Math.PI * 2;
+        const y = (t - 0.5) * height;
+        return point.set(Math.cos(a) * radius, y, Math.sin(a) * radius);
+      }
+    }
+    const path = new HelixCurve();
+    return new T3.TubeGeometry(path, tubularSeg, tube, radialSeg, false);
+  }
+
+  function buildMotor() {
+    while (root.children.length) root.remove(root.children[0]);
+    Object.keys(layerGroups).forEach(k => delete layerGroups[k]);
+
+    const L = 2.4; // stack length (Y)
+    // frame — outer shell
+    {
+      const g = new T3.Group(); g.userData.layer = 'frame';
+      const mesh = new T3.Mesh(
+        new T3.CylinderGeometry(1.55, 1.55, L + 0.15, 48, 1, true),
+        mat(0x6b7280, { transparent: true, opacity: 0.35, metalness: 0.4 })
+      );
+      // end bells (rings)
+      const ringMat = mat(0x4b5563, { transparent: true, opacity: 0.55 });
+      const top = new T3.Mesh(new T3.TorusGeometry(1.55, 0.06, 12, 48), ringMat);
+      top.rotation.x = Math.PI / 2; top.position.y = (L + 0.15) / 2;
+      const bot = top.clone(); bot.position.y = -(L + 0.15) / 2;
+      g.add(mesh, top, bot);
+      layerGroups.frame = g; root.add(g);
+    }
+    // stator_core — thick tube
+    {
+      const g = new T3.Group(); g.userData.layer = 'stator_core';
+      const mesh = new T3.Mesh(
+        new T3.CylinderGeometry(1.45, 1.45, L, 64, 1, false),
+        mat(0x94a3b8, { metalness: 0.5, roughness: 0.45 })
+      );
+      // bore cut via inner darker cylinder (visual only)
+      const bore = new T3.Mesh(
+        new T3.CylinderGeometry(1.05, 1.05, L + 0.02, 64, 1, true),
+        mat(0x64748b, { transparent: true, opacity: 0.9 })
+      );
+      g.add(mesh, bore);
+      layerGroups.stator_core = g; root.add(g);
+    }
+    // windings — 3 phase helix belts, spatially offset 120°
+    {
+      const g = new T3.Group(); g.userData.layer = 'windings';
+      const colors = [0xf59e0b, 0xef4444, 0x3b82f6];
+      for (let ph = 0; ph < 3; ph++) {
+        const geo = makeHelix(1.18, 0.045, 6, L * 0.92, 6, 160, ph * (Math.PI * 2 / 3));
+        const m = new T3.Mesh(geo, mat(colors[ph], { metalness: 0.7, roughness: 0.35 }));
+        g.add(m);
+        // second layer slightly inward
+        const geo2 = makeHelix(1.28, 0.035, 6, L * 0.92, 6, 160, ph * (Math.PI * 2 / 3) + 0.2);
+        g.add(new T3.Mesh(geo2, mat(colors[ph], { metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.85 })));
+      }
+      layerGroups.windings = g; root.add(g);
+    }
+    // air_gap — thin translucent shell
+    {
+      const g = new T3.Group(); g.userData.layer = 'air_gap';
+      const mesh = new T3.Mesh(
+        new T3.CylinderGeometry(1.02, 1.02, L * 0.98, 48, 1, true),
+        mat(0x38bdf8, { transparent: true, opacity: 0.22, metalness: 0, roughness: 0.2, emissive: 0x0ea5e9, emissiveIntensity: 0.15 })
+      );
+      g.add(mesh);
+      layerGroups.air_gap = g; root.add(g);
+    }
+    // rotor_cage — cylinder + end rings + bars
+    {
+      const g = new T3.Group(); g.userData.layer = 'rotor_cage';
+      const body = new T3.Mesh(
+        new T3.CylinderGeometry(0.95, 0.95, L * 0.9, 48),
+        mat(0xa78bfa, { metalness: 0.55, roughness: 0.4 })
+      );
+      const ringMat = mat(0xe9d5ff, { metalness: 0.8, roughness: 0.3 });
+      const rTop = new T3.Mesh(new T3.TorusGeometry(0.92, 0.05, 10, 40), ringMat);
+      rTop.rotation.x = Math.PI / 2; rTop.position.y = L * 0.42;
+      const rBot = rTop.clone(); rBot.position.y = -L * 0.42;
+      g.add(body, rTop, rBot);
+      const barMat = mat(0xddd6fe, { metalness: 0.85, roughness: 0.25 });
+      const nBars = 18;
+      for (let i = 0; i < nBars; i++) {
+        const a = (i / nBars) * Math.PI * 2;
+        const bar = new T3.Mesh(new T3.BoxGeometry(0.06, L * 0.85, 0.08), barMat);
+        bar.position.set(Math.cos(a) * 0.93, 0, Math.sin(a) * 0.93);
+        bar.lookAt(0, 0, 0);
+        g.add(bar);
+      }
+      layerGroups.rotor_cage = g; root.add(g);
+    }
+    // shaft
+    {
+      const g = new T3.Group(); g.userData.layer = 'shaft';
+      const mesh = new T3.Mesh(
+        new T3.CylinderGeometry(0.14, 0.14, L + 1.6, 24),
+        mat(0xe2e8f0, { metalness: 0.9, roughness: 0.25 })
+      );
+      g.add(mesh);
+      layerGroups.shaft = g; root.add(g);
+    }
+    // load — flywheel disk on +Y end
+    {
+      const g = new T3.Group(); g.userData.layer = 'load';
+      const disk = new T3.Mesh(
+        new T3.CylinderGeometry(0.7, 0.7, 0.18, 48),
+        mat(0x34d399, { metalness: 0.4, roughness: 0.45 })
+      );
+      disk.position.y = (L + 1.6) / 2 + 0.05;
+      const hub = new T3.Mesh(
+        new T3.CylinderGeometry(0.22, 0.22, 0.28, 24),
+        mat(0x6ee7b7, { metalness: 0.6, roughness: 0.35 })
+      );
+      hub.position.y = disk.position.y;
+      g.add(disk, hub);
+      layerGroups.load = g; root.add(g);
+    }
+  }
+
+  let explode = 0.35;
+  function applyExplode() {
+    MACHINE.layers.forEach(L => {
+      const g = layerGroups[L.id];
+      if (!g) return;
+      g.position.y = explode * L.explode_offset;
+      // slight radial peel for windings/air_gap/rotor for CloseUp-like strategy
+      const radial = (L.id === 'windings' || L.id === 'air_gap') ? explode * 0.15 : 0;
+      g.scale.set(1 + radial, 1, 1 + radial);
+    });
+  }
+
+  function fit() {
+    const box = new T3.Box3().setFromObject(root);
+    const size = new T3.Vector3(); const center = new T3.Vector3();
+    box.getSize(size); box.getCenter(center);
+    const r = Math.max(size.length() / 2, 0.5);
+    const d = r / Math.sin(cam.fov * Math.PI / 360) * 1.5;
+    cam.near = d / 200; cam.far = d * 50;
+    cam.position.copy(center).add(new T3.Vector3(1.1, 0.7, 1.3).normalize().multiplyScalar(d));
+    cam.updateProjectionMatrix();
+    ctl.target.copy(center); ctl.update();
+  }
+
+  function resize() {
+    const st = document.getElementById('stage');
+    const w = st.clientWidth, h = st.clientHeight;
+    renderer.setSize(w, h, false);
+    cam.aspect = w / Math.max(h, 1);
+    cam.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(document.getElementById('stage'));
+
+  /* ---------- UI ---------- */
+  const layersEl = document.getElementById('layers');
+  MACHINE.layers.forEach(L => {
+    const row = document.createElement('div');
+    row.className = 'layer';
+    row.innerHTML = `<input type="checkbox" id="vis_${L.id}" ${L.visible ? 'checked' : ''}>
+      <span class="swatch" style="background:#${L.color.toString(16).padStart(6,'0')}"></span>
+      <label for="vis_${L.id}">${L.label}</label>`;
+    layersEl.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      const g = layerGroups[L.id];
+      if (g) g.visible = e.target.checked;
+    });
+  });
+
+  const ribbon = document.getElementById('ribbon');
+  ribbon.innerHTML = MACHINE.closed_loop.map((s, i) =>
+    `<span class="step">${s}</span>${i < MACHINE.closed_loop.length - 1 ? '<span class="arr">→</span>' : ''}`
+  ).join('');
+
+  const paramsEl = document.getElementById('params');
+  MACHINE.params.forEach(p => {
+    const wrap = document.createElement('div');
+    wrap.className = 'sl';
+    wrap.innerHTML = `<label>${p.label}</label>
+      <input type="range" id="p_${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.def}">
+      <output id="o_${p.id}">${p.def}</output>`;
+    paramsEl.appendChild(wrap);
+    wrap.querySelector('input').addEventListener('input', e => {
+      let v = parseFloat(e.target.value);
+      if (p.id === 'p') v = Math.max(2, Math.round(v / 2) * 2);
+      P[p.id] = v;
+      document.getElementById('o_' + p.id).textContent = String(v);
+      refreshMath();
+    });
+  });
+
+  document.getElementById('patents').innerHTML = MACHINE.patents.map(([id, t, u]) =>
+    `<div><a href="${u}" target="_blank" rel="noopener">${id}</a> — ${t}</div>`
+  ).join('');
+
+  const outsEl = document.getElementById('outs');
+  function refreshMath() {
+    const r = compute(P);
+    const rows = [
+      ['ns (rpm)', r.ns.toFixed(1), 'known'],
+      ['poles p', String(r.poles), 'known'],
+      ['slip s', r.s.toFixed(4), 'known'],
+      ['n (rpm)', r.n.toFixed(1), 'known'],
+      ['T (N·m)', r.T.toFixed(3), 'est'],
+      ['T_max (N·m)', r.tMax.toFixed(3), 'est'],
+      ['Pin air-gap (W)', r.Pin.toFixed(1), 'est'],
+      ['Pout (W)', r.Pout.toFixed(1), 'est'],
+      ['η', (r.eta * 100).toFixed(1) + '%', 'est'],
+    ];
+    outsEl.innerHTML = rows.map(([a, b, kind]) =>
+      `<b>${a}</b><span class="${kind === 'known' ? 'hi' : ''}">${b}</span>`
+    ).join('');
+    const note = document.getElementById('statusNote');
+    note.textContent = r.stalled
+      ? 'STALL: T_load ≥ T_max — rotor would not hold this load under this approx. [Estimate]'
+      : `Operating on rising torque curve (s ≤ s_Tmax). R1=${P.R1} Ω, X1=${P.X1} Ω reserved for future Thevenin.`;
+    document.getElementById('hud-overlay').innerHTML =
+      `ns ${r.ns.toFixed(0)} rpm · s ${r.s.toFixed(3)} · T ${r.T.toFixed(2)} N·m · η ${(r.eta * 100).toFixed(0)}%`;
+    // spin rotor visually with slip (field vs rotor)
+    rotorSpinRate = (r.ns / 60) * (1 - r.s) * Math.PI * 2 * 0.05; // slowed for visibility
+    fieldSpinRate = (r.ns / 60) * Math.PI * 2 * 0.05;
+  }
+
+  document.getElementById('explode').addEventListener('input', e => {
+    explode = parseFloat(e.target.value);
+    document.getElementById('explodeOut').textContent = explode.toFixed(2);
+    applyExplode();
+  });
+  document.getElementById('bFit').onclick = fit;
+  let autoSpin = false;
+  document.getElementById('bSpin').onclick = () => {
+    autoSpin = !autoSpin; ctl.autoRotate = autoSpin; ctl.autoRotateSpeed = 1.5;
+  };
+  document.getElementById('bMyth').onclick = () => {
+    const d = document.getElementById('mythPanel');
+    d.open = !d.open;
+    if (d.open) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  /* ---------- Animate ---------- */
+  let rotorSpinRate = 0, fieldSpinRate = 0;
+  const clock = new T3.Clock();
+  function tick() {
+    const dt = clock.getDelta();
+    ctl.update();
+    if (layerGroups.rotor_cage) layerGroups.rotor_cage.rotation.y += rotorSpinRate * dt;
+    if (layerGroups.shaft) layerGroups.shaft.rotation.y += rotorSpinRate * dt;
+    if (layerGroups.load) layerGroups.load.rotation.y += rotorSpinRate * dt;
+    if (layerGroups.windings) layerGroups.windings.rotation.y += fieldSpinRate * dt * 0.25;
+    renderer.render(scene, cam);
+    requestAnimationFrame(tick);
+  }
+
+  // QA self-check in console
+  (function qa() {
+    const t = compute({ f: 60, p: 4, V: 230, R1: 1.2, X1: 1.5, R2: 1, X2: 1.5, Nm: 5 });
+    console.assert(Math.abs(t.ns - 1800) < 1e-6, 'ns spot-check f=60 p=4 → 1800', t.ns);
+    const t2 = compute({ f: 60, p: 4, V: 230, R1: 1.2, X1: 1.5, R2: 2, X2: 1.5, Nm: 5 });
+    console.assert(t2.s !== t.s || Math.abs(t2.T - t.T) > 1e-6, 'R2 change should move slip/torque');
+    console.log('[QA] ns=', t.ns, 's=', t.s.toFixed(4), 'T=', t.T.toFixed(3), 'η=', (t.eta * 100).toFixed(1) + '%');
+  })();
+
+  buildMotor();
+  applyExplode();
+  resize();
+  fit();
+  refreshMath();
+  tick();
+})();
+
+  }
+})();
+</script>
+</body>
+</html>
