@@ -1,0 +1,128 @@
+{
+  "id": "induction-motor",
+  "name": "Induction motor (rotating magnetic field)",
+  "family_id": "fam-induction-motor",
+  "viz_tier": "parametric_3d",
+  "basic_patent": "US381968",
+  "description": "Parametric explode of a polyphase induction motor: frame → stator → windings → air gap → rotor cage → shaft → load. Live per-phase equivalent-circuit HUD. [Known] CONCEPT-MATH §2.1.",
+  "layers": [
+    {
+      "id": "frame",
+      "label": "Frame",
+      "description": "Outer cylindrical shell (semi-transparent).",
+      "explode_offset": 0,
+      "default_visible": true,
+      "color": "#6b7280"
+    },
+    {
+      "id": "stator_core",
+      "label": "Stator core",
+      "description": "Thick annular laminated core.",
+      "explode_offset": 0.55,
+      "default_visible": true,
+      "color": "#94a3b8"
+    },
+    {
+      "id": "windings",
+      "label": "Windings",
+      "description": "Spatially offset phase belts (2- or 3-phase approx).",
+      "explode_offset": 1.1,
+      "default_visible": true,
+      "color": "#f59e0b"
+    },
+    {
+      "id": "air_gap",
+      "label": "Air gap",
+      "description": "Thin translucent cylindrical spacer — magnetic gap g.",
+      "explode_offset": 1.65,
+      "default_visible": true,
+      "color": "#38bdf8"
+    },
+    {
+      "id": "rotor_cage",
+      "label": "Rotor cage",
+      "description": "Cylinder + end rings + bar approximations (squirrel cage).",
+      "explode_offset": 2.2,
+      "default_visible": true,
+      "color": "#c084fc"
+    },
+    {
+      "id": "shaft",
+      "label": "Shaft",
+      "description": "Thin drive shaft.",
+      "explode_offset": 2.75,
+      "default_visible": true,
+      "color": "#e2e8f0"
+    },
+    {
+      "id": "load",
+      "label": "Load",
+      "description": "Simple disk / flywheel on shaft end.",
+      "explode_offset": 3.4,
+      "default_visible": true,
+      "color": "#34d399"
+    }
+  ],
+  "params": [
+    { "id": "f", "label": "Supply frequency f", "unit": "Hz", "default": 60, "min": 10, "max": 400, "step": 1 },
+    { "id": "p", "label": "Poles p (even)", "unit": "", "default": 4, "min": 2, "max": 12, "step": 2 },
+    { "id": "V", "label": "Phase voltage V", "unit": "V", "default": 230, "min": 50, "max": 480, "step": 1 },
+    { "id": "R1", "label": "Stator resistance R1", "unit": "Ω", "default": 1.2, "min": 0.1, "max": 10, "step": 0.1 },
+    { "id": "X1", "label": "Stator leakage X1", "unit": "Ω", "default": 1.5, "min": 0.1, "max": 20, "step": 0.1 },
+    { "id": "R2", "label": "Rotor resistance R2'", "unit": "Ω", "default": 1.0, "min": 0.05, "max": 10, "step": 0.05 },
+    { "id": "X2", "label": "Rotor leakage X2'", "unit": "Ω", "default": 1.5, "min": 0.1, "max": 20, "step": 0.1 },
+    { "id": "Nm", "label": "Load torque T_load", "unit": "N·m", "default": 5, "min": 0, "max": 40, "step": 0.5 }
+  ],
+  "outputs": [
+    { "id": "ns", "label": "Synchronous speed ns", "unit": "rpm" },
+    { "id": "s", "label": "Slip s", "unit": "" },
+    { "id": "n", "label": "Rotor speed n", "unit": "rpm" },
+    { "id": "T", "label": "Developed torque T", "unit": "N·m" },
+    { "id": "Pin", "label": "Air-gap / input power Pin (approx)", "unit": "W" },
+    { "id": "Pout", "label": "Mechanical output Pout", "unit": "W" },
+    { "id": "eta", "label": "Efficiency η (approx)", "unit": "" }
+  ],
+  "equations": [
+    {
+      "id": "ns",
+      "latex": "n_s = 120 f / p",
+      "plaintext": "ns = 120 * f / p  (rpm)  [Known]",
+      "notes": "Synchronous speed of the rotating field. f in Hz, p = pole count (even)."
+    },
+    {
+      "id": "slip",
+      "latex": "s = (n_s - n) / n_s",
+      "plaintext": "s = (ns - n) / ns",
+      "notes": "Operating slip solved so developed torque matches T_load (steady-state)."
+    },
+    {
+      "id": "torque",
+      "latex": "T = (3 p / (2 \\omega_s)) * (s R_2 V^2) / (R_2^2 + (s X_2)^2)   [Estimate scale]",
+      "plaintext": "T_phase_shape = s*R2*V^2 / (R2^2 + (s*X2)^2);  T = K * T_phase_shape with K = (3*p)/(4*pi*f) so that units are N·m for a 3-phase approx. Stator R1,X1 omitted from torque peak location (classic rotor-limited approx). [Estimate]",
+      "notes": "Per-phase Thevenin/rotor branch shape from CONCEPT-MATH §2.1. Constant K chosen so T has N·m for SI ohm/volt inputs under a 3-phase teaching model. Not a full IEEE 112 test curve."
+    },
+    {
+      "id": "power",
+      "latex": "P_out = T \\cdot \\omega;\\; \\omega = 2\\pi n/60;\\; \\eta \\approx P_out / P_in",
+      "plaintext": "Pout = T * (2*pi*n/60); Pin ≈ 3 * (V^2 * (s*R2) / (R2^2+(s*X2)^2)) air-gap power proxy; η = Pout/Pin when Pin>0. [Estimate]",
+      "notes": "Pin here is an air-gap power proxy from the rotor branch (ignores stator copper + core). Labelled Estimate."
+    }
+  ],
+  "patent_refs": [
+    "US381968",
+    "US382279",
+    "US416191",
+    "US416194",
+    "US555190"
+  ],
+  "closed_loop": [
+    "electrical input (V, f)",
+    "rotating B at ns",
+    "rotor currents at s·f",
+    "torque T",
+    "mechanical load T_load",
+    "back on slip s"
+  ],
+  "myth_flags": [],
+  "myth_notes": "Ferraris demonstrated a rotating field independently (priority dispute). Industry adopted 3-phase; Tesla's early demos were often 2-phase. No free-energy claim — COP < 1 always for this machine. See 08-speculative-vs-verified.md."
+}
